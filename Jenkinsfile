@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
-        AWS_SESSION_TOKEN     = credentials('AWS_SESSION_TOKEN')
+        AWS_SESSION_TOKEN     = credentials('AWS_SESSION_TOKEN')  // si credentials temporaires
         AWS_DEFAULT_REGION    = "us-west-2"
     }
 
@@ -29,26 +29,19 @@ pipeline {
 
         stage('Validate AWS Credentials') {
             steps {
-                sh '''
-                    echo "Checking AWS identity..."
-                    aws sts get-caller-identity
-                '''
+                sh 'aws sts get-caller-identity'
             }
         }
 
         stage('Terraform Init') {
             steps {
-                sh '''
-                    cd terraform
-                    terraform init
-                '''
+                sh 'terraform init'
             }
         }
 
         stage('Terraform Plan') {
             steps {
                 sh '''
-                    cd terraform
                     terraform plan -out=tfplan
                     terraform show -no-color tfplan > tfplan.txt
                 '''
@@ -61,7 +54,7 @@ pipeline {
             }
             steps {
                 script {
-                    def planText = readFile 'terraform/tfplan.txt'
+                    def planText = readFile 'tfplan.txt'
                     input message: "Do you want to apply the Terraform plan?",
                           parameters: [text(name: 'Terraform Plan', defaultValue: planText)]
                 }
@@ -70,10 +63,7 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                sh '''
-                    cd terraform
-                    terraform apply -input=false tfplan
-                '''
+                sh 'terraform apply -input=false tfplan'
             }
         }
     }
