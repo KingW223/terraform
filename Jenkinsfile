@@ -1,55 +1,89 @@
 pipeline {
+    agent any
+
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+        AWS_SESSION_TOKEN     = credentials('AWS_SESSION_TOKEN')
+        AWS_DEFAULT_REGION    = "us-west-2"
+    }
 
     parameters {
-        booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically run apply after generating plan?')
-   environment {
-    AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
-    AWS_SESSION_TOKEN     = credentials('AWS_SESSION_TOKEN')
-    AWS_DEFAULT_REGION    = "us-west-2"
-}
+        booleanParam(
+            name: 'autoApprove',
+            defaultValue: false,
+            description: 'Automatically apply Terraform plan without manual approval?'
+        )
+    }
 
-   agent  any
+    triggers {
+        githubPush()
+    }
+
     stages {
-        stage('checkout') {
+        stage('Checkout Code') {
             steps {
-                 script{
-                        dir("terraform")
-                        {
-                            git "https://github.com/yeshwanthlm/Terraform-Jenkins.git"
-                        }
-                    }
-                }
-            }
-
-        stage('Plan') {
-            steps {
-                sh 'pwd;cd terraform/ ; terraform init'
-                sh "pwd;cd terraform/ ; terraform plan -out tfplan"
-                sh 'pwd;cd terraform/ ; terraform show -no-color tfplan > tfplan.txt'
+                git branch: 'main', url: 'https://github.com/omarlouis1/terraform.git'
             }
         }
-        stage('Approval') {
-           when {
-               not {
-                   equals expected: true, actual: params.autoApprove
-               }
-           }
 
-           steps {
-               script {
-                    def plan = readFile 'terraform/tfplan.txt'
-                    input message: "Do you want to apply the plan?",
-                    parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
-               }
-           }
-       }
-
-        stage('Apply') {
+        stage('Validate AWS Credentials') {
             steps {
-                sh "pwd;cd terraform/ ; terraform apply -input=false tfplan"
+                sh '''
+                    echo "Checking AWS identity..."
+                    aws sts get-caller-identity
+                '''
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                sh '''
+                    cd terraform
+                    terraform init
+                '''
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                sh '''
+                    cd terraform
+                    terraform plan -out=tfplan
+                    terraform show -no-color tfplan > tfplan.txt
+                '''
+            }
+        }
+
+        stage('Manual Approval') {
+            when {
+                not { equals expected: true, actual: params.autoApprove }
+            }
+            steps {
+                script {
+                    def planText = readFile 'terraform/tfplan.txt'
+                    input message: "Do you want to apply the Terraform plan?",
+                          parameters: [text(name: 'Terraform Plan', defaultValue: planText)]
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                sh '''
+                    cd terraform
+                    terraform apply -input=false tfplan
+                '''
             }
         }
     }
 
-  }
+    post {
+        success {
+            echo "✅ Terraform pipeline completed successfully!"
+        }
+        failure {
+            echo "❌ Terraform pipeline failed. Check logs for details."
+        }
+    }
+}
