@@ -9,3 +9,12 @@ resource "aws_instance" "foo" {
       Name = "TF-Instance"
   }
 }
+resource "aws_s3_bucket" "my_bucket" {
+  bucket = "tf-bucket-example-12345"
+  acl    = "private"
+
+  tags = {
+    Name        = "TF-Bucket"
+    Environment = "Dev"
+  }
+}
