@@ -15,7 +15,7 @@ pipeline {
             description: 'Automatically apply Terraform plan without manual approval?'
         )
     }
-
+   
     triggers {
         githubPush()
     }
