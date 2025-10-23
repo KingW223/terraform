@@ -9,12 +9,4 @@ resource "aws_instance" "foo" {
       Name = "TF-Instance"
   }
 }
-resource "aws_s3_bucket" "my_bucket" {
-  bucket = "omar-tf-bucket-20251023"
-  acl    = "private"
 
-  tags = {
-    Name        = "TF-Bucket"
-    Environment = "Dev"
-  }
-}
