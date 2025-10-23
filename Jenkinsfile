@@ -3,14 +3,13 @@ pipeline {
 
     environment {
         AWS_DEFAULT_REGION = "us-west-2"
-        AWS_ACCOUNT_ID = "332086960978"
     }
 
     parameters {
         booleanParam(
             name: 'autoApprove',
             defaultValue: false,
-            description: 'Automatically apply Terraform plan without manual approval?'
+            description: 'Apply Terraform automatically without manual approval?'
         )
     }
 
@@ -19,42 +18,40 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout Code') {
             steps {
                 git branch: 'main', url: 'https://github.com/omarlouis1/terraform.git'
             }
         }
 
-        stage('Load AWS Credentials from Jenkins') {
+        stage('Assume AWS LabRole') {
             steps {
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
-                    sh 'echo "✅ Credentials chargés depuis Jenkins."'
-                }
-            }
-        }
+                    script {
+                        echo "🔐 Assume Role LabRole en cours..."
 
-        stage('Assume LabRole (Compte AWS 332086960978)') {
-            steps {
-                script {
-                    echo "🔐 Assume Role LabRole en cours..."
+                        sh """
+                        export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                        export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 
-                    sh """
-                    aws sts assume-role \
-                        --role-arn arn:aws:iam::${AWS_ACCOUNT_ID}:role/LabRole \
-                        --role-session-name jenkinsTerraform \
-                        --output json > /tmp/aws-creds.json
-                    """
+                        aws sts assume-role \
+                            --role-arn arn:aws:iam::332086960978:role/LabRole \
+                            --role-session-name jenkinsTerraform \
+                            --output json > /tmp/aws-creds.json
+                        """
 
-                    def creds = readJSON file: '/tmp/aws-creds.json'
+                        def creds = readJSON file: '/tmp/aws-creds.json'
 
-                    env.AWS_ACCESS_KEY_ID     = creds.Credentials.AccessKeyId
-                    env.AWS_SECRET_ACCESS_KEY = creds.Credentials.SecretAccessKey
-                    env.AWS_SESSION_TOKEN     = creds.Credentials.SessionToken
+                        env.AWS_ACCESS_KEY_ID     = creds.Credentials.AccessKeyId
+                        env.AWS_SECRET_ACCESS_KEY = creds.Credentials.SecretAccessKey
+                        env.AWS_SESSION_TOKEN     = creds.Credentials.SessionToken
 
-                    echo "✅ Assume Role réussi !"
+                        echo "✅ Assume Role réussi !"
+                    }
                 }
             }
         }
@@ -71,11 +68,19 @@ pipeline {
             }
         }
 
+        stage('Clean S3 State if Exists') {
+            steps {
+                sh '''
+                    terraform state rm aws_s3_bucket.my_bucket || echo "✔ No S3 bucket in state, skipping."
+                '''
+            }
+        }
+
         stage('Terraform Plan') {
             steps {
                 sh '''
-                terraform plan -out=tfplan
-                terraform show -no-color tfplan > tfplan.txt
+                    terraform plan -out=tfplan
+                    terraform show -no-color tfplan > tfplan.txt
                 '''
             }
         }
@@ -87,7 +92,7 @@ pipeline {
             steps {
                 script {
                     def planText = readFile 'tfplan.txt'
-                    input message: "Souhaites-tu appliquer le plan Terraform ?",
+                    input message: "Do you want to apply this Terraform plan?",
                           parameters: [text(name: 'Terraform Plan', defaultValue: planText)]
                 }
             }
@@ -103,9 +108,19 @@ pipeline {
     post {
         success {
             echo "✅ Pipeline terminé avec succès !"
+            emailext(
+                subject: "✅ SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: "✅ Build réussi pour ${env.JOB_NAME} #${env.BUILD_NUMBER}\n🔗 Détails: ${env.BUILD_URL}",
+                to: "omzokao99@gmail.com"
+            )
         }
         failure {
             echo "❌ Pipeline échoué."
+            emailext(
+                subject: "❌ FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: "💥 Le pipeline a échoué.\nDétails : ${env.BUILD_URL}",
+                to: "omzokao99@gmail.com"
+            )
         }
     }
 }
