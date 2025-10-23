@@ -68,5 +68,26 @@ pipeline {
             }
         }
     }
-
+      post {
+        success {
+            echo "✅ Pipeline terminé avec succès !"
+            emailext(
+                subject: "✅ SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+                ✅ Build réussi pour ${env.JOB_NAME} #${env.BUILD_NUMBER}
+                🔗 Détails: ${env.BUILD_URL}
+                """,
+                to: "omzokao99@gmail.com"
+            )
+        }
+        failure {
+            echo "❌ Échec du pipeline."
+            emailext(
+                subject: "❌ FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: "Le pipeline a échoué 💥\n\nDétails : ${env.BUILD_URL}",
+                to: "omzokao99@gmail.com"
+            )
+        }
+    }
+}
    
