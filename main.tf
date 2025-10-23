@@ -10,7 +10,7 @@ resource "aws_instance" "foo" {
   }
 }
 resource "aws_s3_bucket" "my_bucket" {
-  bucket = "tf-bucket-example-12345"
+  bucket = "omar-tf-bucket-20251023"
   acl    = "private"
 
   tags = {
