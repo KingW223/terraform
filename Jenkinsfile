@@ -2,10 +2,8 @@ pipeline {
     agent any
 
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
-        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
-        AWS_SESSION_TOKEN     = credentials('AWS_SESSION_TOKEN')  // si credentials temporaires
-        AWS_DEFAULT_REGION    = "us-west-2"
+        AWS_DEFAULT_REGION = "us-west-2"
+        AWS_ACCOUNT_ID = "332086960978"
     }
 
     parameters {
@@ -15,7 +13,7 @@ pipeline {
             description: 'Automatically apply Terraform plan without manual approval?'
         )
     }
-   
+
     triggers {
         githubPush()
     }
@@ -27,33 +25,57 @@ pipeline {
             }
         }
 
-        stage('Validate AWS Credentials') {
+        stage('Load AWS Credentials from Jenkins') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    sh 'echo "✅ Credentials chargés depuis Jenkins."'
+                }
+            }
+        }
+
+        stage('Assume LabRole (Compte AWS 332086960978)') {
+            steps {
+                script {
+                    echo "🔐 Assume Role LabRole en cours..."
+
+                    sh """
+                    aws sts assume-role \
+                        --role-arn arn:aws:iam::${AWS_ACCOUNT_ID}:role/LabRole \
+                        --role-session-name jenkinsTerraform \
+                        --output json > /tmp/aws-creds.json
+                    """
+
+                    def creds = readJSON file: '/tmp/aws-creds.json'
+
+                    env.AWS_ACCESS_KEY_ID     = creds.Credentials.AccessKeyId
+                    env.AWS_SECRET_ACCESS_KEY = creds.Credentials.SecretAccessKey
+                    env.AWS_SESSION_TOKEN     = creds.Credentials.SessionToken
+
+                    echo "✅ Assume Role réussi !"
+                }
+            }
+        }
+
+        stage('Validate AWS Identity') {
             steps {
                 sh 'aws sts get-caller-identity'
             }
         }
-            /*stage('Terraform Init') {
+
+        stage('Terraform Init') {
             steps {
                 sh 'terraform init'
             }
-        }*/
-         stage('Clean S3 Bucket from State') {
-    steps {
-        script {
-            // Ignore errors si la ressource n'existe pas déjà dans l'état
-            sh '''
-                terraform state rm aws_s3_bucket.my_bucket || echo "Bucket not in state, skipping"
-            '''
         }
-    }
-}
-
 
         stage('Terraform Plan') {
             steps {
                 sh '''
-                    terraform plan -out=tfplan
-                    terraform show -no-color tfplan > tfplan.txt
+                terraform plan -out=tfplan
+                terraform show -no-color tfplan > tfplan.txt
                 '''
             }
         }
@@ -65,14 +87,11 @@ pipeline {
             steps {
                 script {
                     def planText = readFile 'tfplan.txt'
-                    input message: "Do you want to apply the Terraform plan?",
+                    input message: "Souhaites-tu appliquer le plan Terraform ?",
                           parameters: [text(name: 'Terraform Plan', defaultValue: planText)]
                 }
             }
         }
-
-       
-
 
         stage('Terraform Apply') {
             steps {
@@ -80,26 +99,13 @@ pipeline {
             }
         }
     }
-      post {
+
+    post {
         success {
             echo "✅ Pipeline terminé avec succès !"
-            emailext(
-                subject: "✅ SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """
-                ✅ Build réussi pour ${env.JOB_NAME} #${env.BUILD_NUMBER}
-                🔗 Détails: ${env.BUILD_URL}
-                """,
-                to: "omzokao99@gmail.com"
-            )
         }
         failure {
-            echo "❌ Échec du pipeline."
-            emailext(
-                subject: "❌ FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: "Le pipeline a échoué 💥\n\nDétails : ${env.BUILD_URL}",
-                to: "omzokao99@gmail.com"
-            )
+            echo "❌ Pipeline échoué."
         }
     }
 }
-   
