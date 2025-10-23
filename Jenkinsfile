@@ -34,10 +34,16 @@ pipeline {
         }
 
         stage('Terraform Init') {
-            steps {
-                sh 'terraform init'
-            }
-        }
+    steps {
+        sh '''
+            terraform init \
+            -input=false \
+            -get=false \
+            -lock=false
+        '''
+    }
+}
+
 
         stage('Terraform Plan') {
             steps {
