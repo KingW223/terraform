@@ -32,17 +32,12 @@ pipeline {
                 sh 'aws sts get-caller-identity'
             }
         }
-
-        stage('Terraform Init') {
-    steps {
-        sh '''
-            terraform init \
-            -input=false \
-            -get=false \
-            -lock=false
-        '''
-    }
-}
+            stage('Terraform Init') {
+            steps {
+                sh 'terraform init'
+            }
+        }
+        
 
 
         stage('Terraform Plan') {
