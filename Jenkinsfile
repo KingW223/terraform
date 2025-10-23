@@ -32,10 +32,10 @@ pipeline {
                 sh 'aws sts get-caller-identity'
             }
         }
-            stage('Terraform Init') {
+            /*stage('Terraform Init') {
             steps {
                 sh 'terraform init'
-            }
+            }*/
         }
          stage('Clean S3 Bucket from State') {
     steps {
