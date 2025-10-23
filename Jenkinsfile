@@ -69,18 +69,4 @@ pipeline {
         }
     }
 
-    post {
-        success {
-            echo "✅ Terraform pipeline completed successfully!"
-            mail to: 'omzokao99@gmail.com',
-                 subject: '✅ SUCCESS - Terraform Pipeline',
-                 body: "Bonjour,\n\nLe pipeline Terraform s'est terminé avec succès.\n\nProjet : ${env.JOB_NAME}\nBuild : ${env.BUILD_NUMBER}\nURL : ${env.BUILD_URL}\n\nCordialement,\nJenkins"
-        }
-        failure {
-            echo "❌ Terraform pipeline failed."
-            mail to: 'omzokao99@gmail.com',
-                 subject: '❌ FAILURE - Terraform Pipeline',
-                 body: "Bonjour,\n\nLe pipeline Terraform a échoué.\n\nProjet : ${env.JOB_NAME}\nBuild : ${env.BUILD_NUMBER}\nURL : ${env.BUILD_URL}\n\nMerci de vérifier les logs.\n\nCordialement,\nJenkins"
-        }
-    }
-}
+   
