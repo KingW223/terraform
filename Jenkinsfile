@@ -37,18 +37,7 @@ pipeline {
                 sh 'terraform init'
             }
         }*/
-         stage('Clean S3 Bucket from State') {
-    steps {
-        script {
-            // Ignore errors si la ressource n'existe pas déjà dans l'état
-            sh '''
-                terraform state rm aws_s3_bucket.my_bucket || echo "Bucket not in state, skipping"
-            '''
-        }
-    }
-}
-
-
+        
         stage('Terraform Plan') {
             steps {
                 sh '''
