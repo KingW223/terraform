@@ -104,7 +104,7 @@ resource "aws_instance" "foo" {
   associate_public_ip_address = true
 
   tags = {
-    Name = "TF-Instance"
+    Name = "Terra-Instance"
   }
 }
 
