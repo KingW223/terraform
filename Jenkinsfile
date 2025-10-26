@@ -12,10 +12,10 @@ pipeline {
         booleanParam(
             name: 'autoApprove',
             defaultValue: false,
-            description: 'Automatically apply Terraform plan without manual approval?'
+            description: 'Appliquer automatiquement le plan Terraform sans approbation manuelle ?'
         )
     }
-   
+
     triggers {
         githubPush()
     }
@@ -29,18 +29,26 @@ pipeline {
 
         stage('Validate AWS Credentials') {
             steps {
-                sh 'aws sts get-caller-identity'
+                bat '''
+                    echo Vérification des identifiants AWS...
+                    aws sts get-caller-identity
+                '''
             }
         }
-            /*stage('Terraform Init') {
+
+        stage('Terraform Init') {
             steps {
-                sh 'terraform init'
+                bat '''
+                    echo Initialisation de Terraform...
+                    terraform init
+                '''
             }
-        }*/
-        
+        }
+
         stage('Terraform Plan') {
             steps {
-                sh '''
+                bat '''
+                    echo Génération du plan Terraform...
                     terraform plan -out=tfplan
                     terraform show -no-color tfplan > tfplan.txt
                 '''
@@ -53,32 +61,33 @@ pipeline {
             }
             steps {
                 script {
-                    def planText = readFile 'tfplan.txt'
-                    input message: "Do you want to apply the Terraform plan?",
+                    def planText = readFile('tfplan.txt')
+                    input message: "Souhaitez-vous appliquer le plan Terraform ?",
                           parameters: [text(name: 'Terraform Plan', defaultValue: planText)]
                 }
             }
         }
 
-       
-
-
         stage('Terraform Apply') {
             steps {
-                sh 'terraform apply -input=false tfplan'
+                bat '''
+                    echo Application du plan Terraform...
+                    terraform apply -input=false tfplan
+                '''
             }
         }
     }
-      post {
+
+    post {
         success {
             echo "✅ Pipeline terminé avec succès !"
             emailext(
                 subject: "✅ SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: """
                 ✅ Build réussi pour ${env.JOB_NAME} #${env.BUILD_NUMBER}
-                🔗 Détails: ${env.BUILD_URL}
+                🔗 Détails : ${env.BUILD_URL}
                 """,
-                to: "omzokao99@gmail.com"
+                to: "naziftelecom2@gmail.com"
             )
         }
         failure {
@@ -86,7 +95,7 @@ pipeline {
             emailext(
                 subject: "❌ FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: "Le pipeline a échoué 💥\n\nDétails : ${env.BUILD_URL}",
-                to: "omzokao99@gmail.com"
+                to: "naziftelecom2@gmail.com"
             )
         }
     }
